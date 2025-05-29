@@ -1,15 +1,45 @@
 // ==UserScript==
-// @name         A
-// @description  Planejador e agendador de comandos
-// @version      1.3.9
+// @name         Agendador Silva
+// @description  Agendador de comandos em massa pra tribalwars
+// @version      4.0.0
 // @author       Silva
 // @include      https://**&screen=place*
 // @include      https://**&screen=map*
-// @include      https://**&screen=place*&try=confirm*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=tribalwars.com.br
 // @require      http://cdnjs.cloudflare.com/ajax/libs/jquery-cookie/1.4.1/jquery.cookie.min.js
 // @grant        none
 // ==/UserScript==
+
+// Modularização: funções reutilizáveis
+function formatarHorario(data) {
+    const ano = data.getFullYear();
+    const mes = String(data.getMonth() + 1).padStart(2, '0');
+    const dia = String(data.getDate()).padStart(2, '0');
+    const horas = String(data.getHours()).padStart(2, '0');
+    const minutos = String(data.getMinutes()).padStart(2, '0');
+    const segundos = String(data.getSeconds()).padStart(2, '0');
+    const milissegundos = String(data.getMilliseconds()).padStart(3, '0');
+    return `${ano}-${mes}-${dia}T${horas}:${minutos}:${segundos}.${milissegundos}`;
+}
+
+function mostrarMensagem(msg, tipo = "info") {
+    const msgBox = document.createElement("div");
+    msgBox.textContent = msg;
+    msgBox.className = `alert-${tipo}`;
+    msgBox.style = "background:#f4e6c4; border:1px solid #7d510f; padding:5px; margin:5px;";
+    document.getElementById('contentContainer')?.prepend(msgBox);
+    setTimeout(() => msgBox.remove(), 5000);
+}
+
+//============================= Sincronização com servidor ===============================================
+function getServerTimestamp() {
+    const timeEl = document.getElementById("serverTime");
+    if (!timeEl) return getServerTimestamp();
+    const timeStr = timeEl.textContent.trim(); // formato "13:45:02"
+    const dateStr = new Date().toISOString().split("T")[0]; // formato "2025-04-22"
+    const serverDateTime = new Date(`${dateStr}T${timeStr}Z`);
+    return serverDateTime.getTime();
+}
 
 //================================================== Agendador comandos ==========================================================================
 let commands = document.getElementById('command_actions');
@@ -24,17 +54,14 @@ const hasArcher = game_data.units.includes("archer");
         let AgendarM = `<div id="divScriptRodando">
     <table id="avisoScript" width="100%" style="margin-bottom: 5px;"><tbody><tr><td><table class="content-border" width="100%" cellspacing="0"><tbody><tr><td style="background-color: rgb(193,162,100); background-image:
     url(https://dsbr.innogamescdn.com/asset/7fe7ab60/graphic/screen/tableheader_bg3.png); background-repeat: repeat-x;"><table class="main" width="100%"><tbody><tr><td style="text-align: center; width: 100%;"><h1 style="margin-bottom: 0px;">
-    AGENDAMENTOS</h1></td><td style="text-align: right;"><div style="background-color: white; height: 1.2em; width: 1.5em; padding: 2px;"><img id="tocaSom" style="cursor:pointer;" alt="loud_sound" class="emoji"
-    src="https://media.innogamescdn.com/TribalWars/emoji/1f50a.png"><audio id="audioElement" preload="auto" autoplay volume="1" loop><source src="https://cdn.freesound.org/previews/448/448713_4473224-lq.mp3" type="audio/mpeg">
+    AGENDADOR </h1></td><td style="text-align: right;"><div style="background-color: white; height: 1.2em; width: 1.5em; padding: 2px;"><img id="tocaSom" style="cursor:pointer;" alt="loud_sound" class="emoji"
+    src="https://media.innogamescdn.com/TribalWars/emoji/1f50a.png"><audio id="audioElement" preload="auto" autoplay volume="10" loop><source src="https://cdn.freesound.org/previews/448/448713_4473224-lq.mp3" type="audio/mpeg">
     Seu navegador não suporta o elemento de áudio.</audio></div></td></tr></tbody></table></td></tr></tbody></table></td></tr></tbody></table></div>
     `;
         // Captura a referência para a tabela de destino
         const Agendart = document.getElementById('contentContainer');
         // Adiciona a nova div antes da divBorda
         Agendart.insertAdjacentHTML('beforebegin', AgendarM);
-
-
-        let diffDias = localStorage.getItem('diffDias');
 
         let $InfoTimeTrops = `<div id="command_tempo_alvo" class="clearfix vis " style="width: 890px; border: 1px solid #7d510f; margin: 0px 5px 15px 5px;"><h4>Tempo de Tropas até Destino:</h4><table class="vis" style="border-collapse:separate; border-spacing: 3px; table-layout: fixed; width: 100%;"><tbody><tr><th style="width: 10px"><a href="#" class="unit_link" data-unit="spear"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_spear.png" data-title="Lanceiro"></a></th><th style="width: 10px"><a href="#" class="unit_link" data-unit="sword"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_sword.png" data-title="Espadachim"></a></th><th style="width: 10px"><a href="#" class="unit_link" data-unit="axe"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_axe.png" data-title="Bárbaro"></a></th><th style="width: 10px"><a href="#" class="unit_link" data-unit="archer"><img src="https://dsbr.innogamescdn.com/asset/c1748d3c/graphic/unit/unit_archer.png" data-title="Arqueiro"></a></th><th style="width: 10px"><a href="#" class="unit_link" data-unit="spy"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_spy.png" data-title="Explorador"></a></th><th style="width: 10px"><a href="#" class="unit_link" data-unit="light"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_light.png" data-title="Cavalaria leve"></a></th><th style="width: 10px"><a href="#" class="unit_link" data-unit="marcher"><img src="https://dsbr.innogamescdn.com/asset/c1748d3c/graphic/unit/unit_marcher.png" data-title="Arqueiro a Cavalo"></a></th><th style="width: 10px"><a href="#" class="unit_link" data-unit="heavy"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_heavy.png" data-title="Cavalaria pesada"></a></th><th style="width: 10px"><a href="#" class="unit_link" data-unit="ram"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_ram.png" data-title="Aríete"></a></th><th style="width: 10px"><a href="#" class="unit_link" data-unit="catapult"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_catapult.png" data-title="Catapulta"></a></th><th style="width: 10px"><a href="#" class="unit_link" data-unit="knight"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_knight.png" data-title="Paladino"></a></th><th style="width: 10px"><a href="#" class="unit_link" data-unit="snob"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_snob.png" data-title="Nobre"></a></th></tr><tr class="units-row"><td style="width: 10px" id="spear" class="nowrap unit-item unit-item-spear"></td><td style="width: 10px" id="sword" class="nowrap unit-item unit-item-sword"></td><td style="width: 10px" id="axe" class="nowrap unit-item unit-item-axe"></td><td style="width: 10px" id="archer" class="nowrap unit-item unit-item-archer"></td><td style="width: 10px" id="spy" class="nowrap unit-item unit-item-spy"></td><td style="width: 10px" id="light" class="nowrap unit-item unit-item-light"></td><td style="width: 10px" id="marcher" class="nowrap unit-item unit-item-archer"></td><td style="width: 10px" id="heavy" class="nowrap unit-item unit-item-heavy"></td><td style="width: 10px" id="ram" class="nowrap unit-item unit-item-ram"></td><td style="width: 10px" id="catapult" class="nowrap unit-item unit-item-catapult"></td><td style="width: 10px" id="knight" class="nowrap unit-item unit-item-knight"></td><td style="width: 10px" id="snob" class="nowrap unit-item unit-item-snob"></td></tr></tbody></table></div>`;
 
@@ -64,7 +91,7 @@ const hasArcher = game_data.units.includes("archer");
     </div></h4><table style="display: none;" name="tab_nt2"><tbody><tr><th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="spear"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_spear.png" data-title="Lanceiro"></a></th>
     <th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="sword"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_sword.png" data-title="Espadachim"></a></th>
     <th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="axe"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_axe.png" data-title="Bárbaro"></a></th>
-    ${hasArcher ? '<th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="archer"><img src="https://dsbr.innogamescdn.com/asset/c1748d3c/graphic/unit/unit_archer.png" data-title="Arqueiro"></a></th>' : "" }
+    ${hasArcher ? '<th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="archer"><img src="https://dsbr.innogamescdn.com/asset/c1748d3c/graphic/unit/unit_archer.png" data-title="Arqueiro"></a></th>' : ""}
     <th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="spy"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_spy.png" data-title="Explorador"></a></th>
     <th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="knight"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_knight.png" data-title="Paladino"></a></th>
     </tr>
@@ -72,13 +99,13 @@ const hasArcher = game_data.units.includes("archer");
     <input id="unit_input_spear_nt2" type="text" data-all-count="0" value="0" style="width: 25px;"></td>
     <td style="width: 10px" class="nowrap unit-item unit-item-sword"><input id="unit_input_sword_nt2" type="text" data-all-count="0" value="0" style="width: 25px;"></td>
     <td style="width: 10px" class="nowrap unit-item unit-item-axe"><input id="unit_input_axe_nt2" type="text" data-all-count="0" value="0" style="width: 25px;"></td>
-    ${hasArcher ? '<td style="width: 10px" class="nowrap unit-item unit-item-archer"><input id="unit_input_archer_nt2" type="text" data-all-count="0" value="0" style="width: 25px;"></td>' : "" }
+    ${hasArcher ? '<td style="width: 10px" class="nowrap unit-item unit-item-archer"><input id="unit_input_archer_nt2" type="text" data-all-count="0" value="0" style="width: 25px;"></td>' : ""}
     <td style="width: 10px" class="nowrap unit-item unit-item-spy"><input id="unit_input_spy_nt2" type="text" data-all-count="0" value="0" style="width: 25px;"></td>
     <td style="width: 10px" class="nowrap unit-item unit-item-knight"><input id="unit_input_knight_nt2" type="text" data-all-count="0" value="0" style="width: 25px;"></td>
     </tr>
     <tr>
     <th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="light"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_light.png" data-title="Cavalaria leve"></a></th>
-    ${hasArcher ? '<th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="marcher"><img src="https://dsbr.innogamescdn.com/asset/c1748d3c/graphic/unit/unit_marcher.png" data-title="Arqueiro a Cavalo"></a></th>' : "" }
+    ${hasArcher ? '<th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="marcher"><img src="https://dsbr.innogamescdn.com/asset/c1748d3c/graphic/unit/unit_marcher.png" data-title="Arqueiro a Cavalo"></a></th>' : ""}
     <th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="heavy"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_heavy.png" data-title="Cavalaria pesada"></a></th>
     <th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="ram"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_ram.png" data-title="Ariete"></a></th>
     <th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="catapult"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_catapult.png" data-title="Catapulta"></a></th>
@@ -86,7 +113,7 @@ const hasArcher = game_data.units.includes("archer");
     </tr>
     <tr class="units-row"><td style="width: 10px" class="nowrap unit-item unit-item-light">
     <input id="unit_input_light_nt2" type="text" data-all-count="0" value="0" style="width: 25px;"></td><td style="width: 10px" class="nowrap unit-item unit-item-archer">
-    ${hasArcher ? '<input id="unit_input_marcher_nt2" type="text" data-all-count="0" value="0" style="width: 25px;"></td><td style="width: 10px" class="nowrap unit-item unit-item-heavy">' : "" }
+    ${hasArcher ? '<input id="unit_input_marcher_nt2" type="text" data-all-count="0" value="0" style="width: 25px;"></td><td style="width: 10px" class="nowrap unit-item unit-item-heavy">' : ""}
     <input id="unit_input_heavy_nt2" type="text" data-all-count="0" value="0" style="width: 25px;"></td><td style="width: 10px" class="nowrap unit-item unit-item-ram">
     <input id="unit_input_ram_nt2" type="text" data-all-count="0" value="0" style="width: 25px;"></td><td style="width: 10px" class="nowrap unit-item unit-item-catapult">
     <input id="unit_input_catapult_nt2" type="text" data-all-count="0" value="0" style="width: 25px;"></td><td style="width: 10px" class="nowrap unit-item unit-item-snob">
@@ -102,7 +129,7 @@ const hasArcher = game_data.units.includes("archer");
          <th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="spear"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_spear.png" data-title="Lanceiro"></a></th>
          <th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="sword"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_sword.png" data-title="Espadachim"></a></th>
          <th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="axe"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_axe.png" data-title="Bárbaro"></a></th>
-         ${hasArcher ? '<th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="archer"><img src="https://dsbr.innogamescdn.com/asset/c1748d3c/graphic/unit/unit_archer.png" data-title="Arqueiro"></a></th>' : "" }
+         ${hasArcher ? '<th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="archer"><img src="https://dsbr.innogamescdn.com/asset/c1748d3c/graphic/unit/unit_archer.png" data-title="Arqueiro"></a></th>' : ""}
          <th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="spy"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_spy.png" data-title="Explorador"></a></th>
          <th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="knight"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_knight.png" data-title="Paladino"></a></th>
       </tr>
@@ -116,7 +143,7 @@ const hasArcher = game_data.units.includes("archer");
          <td style="width: 10px" class="nowrap unit-item unit-item-axe">
             <input id="unit_input_axe_nt3" type="text" data-all-count="0" value="0" style="width: 25px;">
          </td>
-         ${hasArcher ? '<td style="width: 10px" class="nowrap unit-item unit-item-archer"><input id="unit_input_archer_nt3" type="text" data-all-count="0" value="0" style="width: 25px;"></td>' : "" }
+         ${hasArcher ? '<td style="width: 10px" class="nowrap unit-item unit-item-archer"><input id="unit_input_archer_nt3" type="text" data-all-count="0" value="0" style="width: 25px;"></td>' : ""}
          <td style="width: 10px" class="nowrap unit-item unit-item-spy">
             <input id="unit_input_spy_nt3" type="text" data-all-count="0" value="0" style="width: 25px;">
          </td>
@@ -126,7 +153,7 @@ const hasArcher = game_data.units.includes("archer");
       </tr>
       <tr>
          <th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="light"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_light.png" data-title="Cavalaria leve"></a></th>
-         ${hasArcher ? '<th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="marcher"><img src="https://dsbr.innogamescdn.com/asset/c1748d3c/graphic/unit/unit_marcher.png" data-title="Arqueiro a Cavalo"></a></th>' : "" }
+         ${hasArcher ? '<th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="marcher"><img src="https://dsbr.innogamescdn.com/asset/c1748d3c/graphic/unit/unit_marcher.png" data-title="Arqueiro a Cavalo"></a></th>' : ""}
          <th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="heavy"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_heavy.png" data-title="Cavalaria pesada"></a></th>
          <th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="ram"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_ram.png" data-title="Ariete"></a></th>
          <th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="catapult"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_catapult.png" data-title="Catapulta"></a></th>
@@ -136,7 +163,7 @@ const hasArcher = game_data.units.includes("archer");
          <td style="width: 10px" class="nowrap unit-item unit-item-light">
             <input id="unit_input_light_nt3" type="text" data-all-count="0" value="0" style="width: 25px;">
          </td>
-         ${hasArcher ? '<td style="width: 10px" class="nowrap unit-item unit-item-archer"><input id="unit_input_marcher_nt3" type="text" data-all-count="0" value="0" style="width: 25px;"></td>' : "" }
+         ${hasArcher ? '<td style="width: 10px" class="nowrap unit-item unit-item-archer"><input id="unit_input_marcher_nt3" type="text" data-all-count="0" value="0" style="width: 25px;"></td>' : ""}
          <td style="width: 10px" class="nowrap unit-item unit-item-heavy">
             <input id="unit_input_heavy_nt3" type="text" data-all-count="0" value="0" style="width: 25px;">
          </td>
@@ -163,7 +190,7 @@ const hasArcher = game_data.units.includes("archer");
              <th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="spear"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_spear.png" data-title="Lanceiro"></a></th>
              <th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="sword"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_sword.png" data-title="Espadachim"></a></th>
              <th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="axe"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_axe.png" data-title="Bárbaro"></a></th>
-             ${hasArcher ? '<th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="archer"><img src="https://dsbr.innogamescdn.com/asset/c1748d3c/graphic/unit/unit_archer.png" data-title="Arqueiro"></a></th>' : "" }
+             ${hasArcher ? '<th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="archer"><img src="https://dsbr.innogamescdn.com/asset/c1748d3c/graphic/unit/unit_archer.png" data-title="Arqueiro"></a></th>' : ""}
              <th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="spy"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_spy.png" data-title="Explorador"></a></th>
              <th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="knight"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_knight.png" data-title="Paladino"></a></th>
           </tr>
@@ -177,7 +204,7 @@ const hasArcher = game_data.units.includes("archer");
              <td style="width: 10px" class="nowrap unit-item unit-item-axe">
                 <input id="unit_input_axe_nt4" type="text" data-all-count="0" value="0" style="width: 25px;">
              </td>
-             ${hasArcher ? '<td style="width: 10px" class="nowrap unit-item unit-item-archer"><input id="unit_input_archer_nt4" type="text" data-all-count="0" value="0" style="width: 25px;"></td>' : "" }
+             ${hasArcher ? '<td style="width: 10px" class="nowrap unit-item unit-item-archer"><input id="unit_input_archer_nt4" type="text" data-all-count="0" value="0" style="width: 25px;"></td>' : ""}
              <td style="width: 10px" class="nowrap unit-item unit-item-spy">
                 <input id="unit_input_spy_nt4" type="text" data-all-count="0" value="0" style="width: 25px;">
              </td>
@@ -187,7 +214,7 @@ const hasArcher = game_data.units.includes("archer");
           </tr>
           <tr>
              <th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="light"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_light.png" data-title="Cavalaria leve"></a></th>
-             ${hasArcher ? '<th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="marcher"><img src="https://dsbr.innogamescdn.com/asset/c1748d3c/graphic/unit/unit_marcher.png" data-title="Arqueiro a Cavalo"></a></th>' : "" }
+             ${hasArcher ? '<th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="marcher"><img src="https://dsbr.innogamescdn.com/asset/c1748d3c/graphic/unit/unit_marcher.png" data-title="Arqueiro a Cavalo"></a></th>' : ""}
              <th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="heavy"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_heavy.png" data-title="Cavalaria pesada"></a></th>
              <th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="ram"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_ram.png" data-title="Ariete"></a></th>
              <th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="catapult"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_catapult.png" data-title="Catapulta"></a></th>
@@ -197,7 +224,7 @@ const hasArcher = game_data.units.includes("archer");
              <td style="width: 10px" class="nowrap unit-item unit-item-light">
                 <input id="unit_input_light_nt4" type="text" data-all-count="0" value="0" style="width: 25px;">
              </td>
-             ${hasArcher ? '<td style="width: 10px" class="nowrap unit-item unit-item-archer"><input id="unit_input_marcher_nt4" type="text" data-all-count="0" value="0" style="width: 25px;"></td>' : "" }
+             ${hasArcher ? '<td style="width: 10px" class="nowrap unit-item unit-item-archer"><input id="unit_input_marcher_nt4" type="text" data-all-count="0" value="0" style="width: 25px;"></td>' : ""}
              <td style="width: 10px" class="nowrap unit-item unit-item-heavy">
                 <input id="unit_input_heavy_nt4" type="text" data-all-count="0" value="0" style="width: 25px;">
              </td>
@@ -224,7 +251,7 @@ const hasArcher = game_data.units.includes("archer");
              <th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="spear"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_spear.png" data-title="Lanceiro"></a></th>
              <th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="sword"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_sword.png" data-title="Espadachim"></a></th>
              <th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="axe"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_axe.png" data-title="Bárbaro"></a></th>
-             ${hasArcher ? '<th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="archer"><img src="https://dsbr.innogamescdn.com/asset/c1748d3c/graphic/unit/unit_archer.png" data-title="Arqueiro"></a></th>' : "" }
+             ${hasArcher ? '<th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="archer"><img src="https://dsbr.innogamescdn.com/asset/c1748d3c/graphic/unit/unit_archer.png" data-title="Arqueiro"></a></th>' : ""}
              <th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="spy"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_spy.png" data-title="Explorador"></a></th>
              <th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="knight"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_knight.png" data-title="Paladino"></a></th>
           </tr>
@@ -238,7 +265,7 @@ const hasArcher = game_data.units.includes("archer");
              <td style="width: 10px" class="nowrap unit-item unit-item-axe">
                 <input id="unit_input_axe_nt5" type="text" data-all-count="0" value="0" style="width: 25px;">
              </td>
-             ${hasArcher ? '<td style="width: 10px" class="nowrap unit-item unit-item-archer"><input id="unit_input_archer_nt5" type="text" data-all-count="0" value="0" style="width: 25px;"></td>' : "" }
+             ${hasArcher ? '<td style="width: 10px" class="nowrap unit-item unit-item-archer"><input id="unit_input_archer_nt5" type="text" data-all-count="0" value="0" style="width: 25px;"></td>' : ""}
              <td style="width: 10px" class="nowrap unit-item unit-item-spy">
                 <input id="unit_input_spy_nt5" type="text" data-all-count="0" value="0" style="width: 25px;">
              </td>
@@ -248,7 +275,7 @@ const hasArcher = game_data.units.includes("archer");
           </tr>
           <tr>
              <th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="light"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_light.png" data-title="Cavalaria leve"></a></th>
-             ${hasArcher ? '<th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="marcher"><img src="https://dsbr.innogamescdn.com/asset/c1748d3c/graphic/unit/unit_marcher.png" data-title="Arqueiro a Cavalo"></a></th>' : "" }
+             ${hasArcher ? '<th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="marcher"><img src="https://dsbr.innogamescdn.com/asset/c1748d3c/graphic/unit/unit_marcher.png" data-title="Arqueiro a Cavalo"></a></th>' : ""}
              <th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="heavy"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_heavy.png" data-title="Cavalaria pesada"></a></th>
              <th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="ram"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_ram.png" data-title="Ariete"></a></th>
              <th style="width: 10px"><a tabindex="-1" href="#" class="unit_link" data-unit="catapult"><img src="https://dsbr.innogamescdn.com/asset/0e187870/graphic/unit/unit_catapult.png" data-title="Catapulta"></a></th>
@@ -258,7 +285,7 @@ const hasArcher = game_data.units.includes("archer");
              <td style="width: 10px" class="nowrap unit-item unit-item-light">
                 <input id="unit_input_light_nt5" type="text" data-all-count="0" value="0" style="width: 25px;">
              </td>
-             ${hasArcher ? '<td style="width: 10px" class="nowrap unit-item unit-item-archer"><input id="unit_input_marcher_nt5" type="text" data-all-count="0" value="0" style="width: 25px;"></td>' : "" }
+             ${hasArcher ? '<td style="width: 10px" class="nowrap unit-item unit-item-archer"><input id="unit_input_marcher_nt5" type="text" data-all-count="0" value="0" style="width: 25px;"></td>' : ""}
              <td style="width: 10px" class="nowrap unit-item unit-item-heavy">
                 <input id="unit_input_heavy_nt5" type="text" data-all-count="0" value="0" style="width: 25px;">
              </td>
@@ -287,7 +314,6 @@ const hasArcher = game_data.units.includes("archer");
     <div class="target-select clearfix vis " style="margin: 0px; border: 0; border-top: 1px solid #7d510f;"><h4>Agendar em Massa:</h4><tr><td colspan="10"><button class="btn am-form-element" id="OpenCommand" type="button" >Agendar</button>
     </td><td><button class="btn am-form-element" id="showComandos" type="button" >Comandos Agendados</button></td></tr></div>
     </tbody></table></div>
-
     <table class="vis" style="width: 100%"><tbody>
     <div class="target-select clearfix vis " style="margin: 0px; border: 0; border-top: 1px solid #7d510f;"><h4>Apagar em Massa:</h4>
     <tr>
@@ -296,7 +322,6 @@ const hasArcher = game_data.units.includes("archer");
     </table>
     </tbody>
     </div>
-
     <style>
     .tooltipDiv .tooltiptext {
         visibility: hidden;
@@ -318,7 +343,7 @@ const hasArcher = game_data.units.includes("archer");
         visibility: visible;
         opacity: 1;
     }</style>`;
-    let comag = `
+        let comag = `
     <div id="command_target_mass" class="target-select clearfix vis" style="width: 370px; margin: 0px; border: 0; border-top: 1px solid #7d510f;">
         <h4>Informações de Comandos Agendados:</h4>
         <table class="vis" style="border-collapse: separate; border-spacing: 3px; table-layout: fixed; width: 100%;">
@@ -354,9 +379,16 @@ const hasArcher = game_data.units.includes("archer");
  <tr><td colspan="5"><span>Alvo das Catapultas: </span></td><td colspan="7"><select id="alvoCatC" style="font-size: 9pt;"><option value="padrao">Padrão</option><option value="main">Edifício principal</option><option value="barracks">Quartel</option><option value="stable">Estábulo</option>
     <option value="garage">Oficina</option><option value="watchtower">Torre de vigia</option><option value="snob">Academia</option><option value="smith">Ferreiro</option><option value="place">Praça de reunião</option>
     <option value="statue">Estátua</option><option value="market">Mercado</option><option value="wood">Bosque</option><option value="stone">Poço de argila</option><option value="iron">Mina de ferro</option><option value="farm">Fazenda</option>
-    <option value="storage">Armazém</option><option value="wall">Muralha</option></select></td></tr><tr><td colspan="6"><span>Horário Saida:</span>
- <input id="Hsaida" value="2024-09-30T00:00:00" type="datetime-local" readonly=""></td><td colspan="6"><span>Horário Chegada:</span><input id="Hchegada" value="2024-10-01T21:45:45.141" type="datetime-local" readonly=""></td></tr></tbody></table></div></div></div>
-    `;
+    <option value="storage">Armazém</option><option value="wall">Muralha</option></select></td></tr><tr>
+ <td colspan="6" style="padding-right: 20px;">
+  <span>Horário Saida:</span>
+  <input id="Hsaida" value="2024-09-30T00:00:00" type="datetime-local" readonly="">
+</td>
+<td> </td>
+<td colspan="6">
+  <span>Horário Chegada:</span>
+  <input id="Hchegada" value="2024-10-01T21:45:45.141" type="datetime-local" readonly="">
+</td>`;
         let activeWorldData = JSON.parse(localStorage.getItem('activeTW')) || {};
         let coordsToID = JSON.parse(localStorage.getItem(`coordsToID_${activeWorldData['world']}`)) || {};
 
@@ -462,14 +494,14 @@ const hasArcher = game_data.units.includes("archer");
                             // Extrai as coordenadas
                             const Cfrom = coordinateorigem[1]; // '699|566'
                             [x1, y1] = Cfrom.split('|').map(Number); // Divide em x1 e y1 e converte para número
-                            // console.log(`x1: ${x1}, y1: ${y1}`); // Exibe os valores
+                            console.log(`x1: ${x1}, y1: ${y1}`); // Exibe os valores
                         }
 
                         if (coordinatedestine) {
                             // Extrai as coordenadas
                             const Cto = coordinatedestine[1]; // '699|566'
                             [x2, y2] = Cto.split('|').map(Number); // Divide em x2 e y2 e converte para número
-                            // console.log(`x2: ${x2}, y2: ${y2}`); // Exibe os valores
+                            console.log(`x2: ${x2}, y2: ${y2}`); // Exibe os valores
                         }
 
                         let deltaX = Math.abs(x1 - x2);
@@ -505,7 +537,7 @@ const hasArcher = game_data.units.includes("archer");
                                     const unitTime = distance * speed * 60000;
                                     const formattedTime = formatTime(unitTime);
 
-                                    $units[unitName] = {speed, unitTime};
+                                    $units[unitName] = { speed, unitTime };
 
                                     // Exibe apenas os elementos correspondentes da unidade requisitada
                                     $('#command_tempo_alvo th a[data-unit="' + unitName + '"]').closest('th').css('display', 'table-cell');
@@ -546,21 +578,28 @@ const hasArcher = game_data.units.includes("archer");
                                     'unit_input_knight',
                                     'unit_input_snob',
                                 ];
+
                                 unitsM.forEach(id => {
                                     const input = document.getElementById(id);
+                                    if (!input) return; // se não existir, ignora
                                 });
+
                                 for (let i = 0; i < unitsM.length; i++) {
                                     const inputElement = document.getElementById(unitsM[i]);
-                                    const unitName = inputElement?.name; // Obtém o nome da unidade
-                                    const inputValue = inputElement?.value || 0; // Obtém o valor do input
+                                    if (!inputElement) continue;
+                                    const unitName = inputElement.name;
+                                    const inputValue = inputElement.value || 0;
+
                                     const checkbox = document.querySelector(`input[type="checkbox"][name="${unitName}"]`);
+                                    if (!unitName) continue;
+
                                     if (!checkbox?.checked) {
-                                        selectedUnits.push({unitName, inputValue});
+                                        selectedUnits.push({ unitName, inputValue });
                                     } else {
-                                        const inputValue = 'all';
-                                        selectedUnits.push({unitName, inputValue});
+                                        selectedUnits.push({ unitName, inputValue: 'all' });
                                     }
                                 }
+
 
                                 console.log(selectedUnits)
                                 // Processa o XML e calcula unitTime para as unidades
@@ -594,7 +633,17 @@ const hasArcher = game_data.units.includes("archer");
                                     // Exibe o resultado na interface, se necessário
                                 }
                                 const villageNumber = extrairIdDaPagina();
+
                                 let horario = document.getElementById('definirHorario').value || 'C';
+                                if (!document.getElementById('CStime').value) {
+                                    mostrarMensagem("Por favor, selecione um horário para agendamento.", "erro");
+                                    return;
+                                }
+                                if (selectedUnits.length === 0) {
+                                    mostrarMensagem("Selecione ao menos uma unidade para enviar.", "erro");
+                                    return;
+                                }
+
                                 let nome;
                                 let link = `${villageNumber}&screen=place&x=${x2}&y=${y2}`;
                                 let Dsaida;
@@ -720,7 +769,10 @@ const hasArcher = game_data.units.includes("archer");
                                     // Ordena o array pela data de Dsaida
                                     savedModels.sort((a, b) => new Date(a.Dsaida) - new Date(b.Dsaida));
                                     console.log('Modelos organizados pela data de saída:', savedModels);
+
+                                    mostrarMensagem("Comando agendado com sucesso!", "sucesso");
                                     // console.log(`Modelo salvo: ${JSON.stringify(savedModels, null, 2)}` );
+
                                 }
 
                                 return units;
@@ -781,7 +833,35 @@ const hasArcher = game_data.units.includes("archer");
                     if (timeDiff <= 1000 * 2 * 20 && !model.opened) {
                         model.opened = true; // Marca o modelo como aberto
                         localStorage.setItem('savedModels', JSON.stringify(savedModels));
-                        window.open(model.link, '_blank'); // Abre o link em uma nova aba
+                        // Abre o link em uma nova aba e salva a referência da janela
+                        const win = window.open(model.link, '_blank');
+                        // Envia uma mensagem para a nova janela para fechar após submit
+                        if (win) {
+                            win.addEventListener('load', function () {
+                                // Tenta encontrar o botão de submit e adicionar o evento
+                                try {
+                                    const tryClose = () => {
+                                        const btn = win.document.getElementById('troop_confirm_submit');
+                                        if (btn) {
+                                            btn.addEventListener('click', function () {
+                                                setTimeout(() => {
+                                                    win.close();
+                                                }, 5000);
+                                            });
+                                        } else {
+                                            // Tenta novamente após um pequeno delay
+                                            setTimeout(tryClose, 500);
+                                        }
+                                    };
+                                    tryClose();
+                                } catch (e) {
+                                    // fallback: fecha após 8s se não conseguir injetar
+                                    setTimeout(() => {
+                                        win.close();
+                                    }, 8000);
+                                }
+                            });
+                        }
                     } else if (model.opened) {
                         setTimeout(() => {
                             savedModels.splice(index, 1); // Remove o modelo da lista
@@ -792,94 +872,85 @@ const hasArcher = game_data.units.includes("archer");
             } else if (document.getElementById('command_target_mass') && savedModels.length <= 0) {
                 document.getElementById('command_target_mass').remove();
             }
-//================ config para exibição info de comandos agendados ================================
-const row = document.getElementById('TropC');
+            //================ config para exibição info de comandos agendados ================================
+            const row = document.getElementById('TropC');
 
-if (savedModels.length > 0) {
-    if (row.children.length === 0) {
-        savedModels[0].units.forEach(unit => {
-            const td = document.createElement('td');
-            td.style.width = '15px';
-            const unitName = unit.unitName || 'Unnamed';
-            td.textContent = unitName;
-            td.style.textAlign = 'left';
-            row.appendChild(td);
-        });
-    }
+            if (savedModels.length > 0 && savedModels[0]) {
+                const firstModel = savedModels[0];
 
-    savedModels[0].units.forEach((unit, index) => {
-        const td = row.children[index];
-        td.textContent = unit.inputValue;
-    });
+                // Preenche os dados da linha (TropC) com os nomes das unidades
+                if (row.children.length === 0) {
+                    firstModel.units.forEach(unit => {
+                        const td = document.createElement('td');
+                        td.style.width = '15px';
+                        const unitName = unit.unitName || 'Unnamed';
+                        td.textContent = unitName;
+                        td.style.textAlign = 'left';
+                        row.appendChild(td);
+                    });
+                }
 
-    // Define ícone e cor com base no tipo de comando
-    console.log(
-        savedModels[0].nome,
-        savedModels[0].NtType,
-        savedModels[0].nome === 'Atak' && savedModels[0].NtType == '0'
-    )
-    if (savedModels[0].nome === 'Atak' && savedModels[0].NtType == '0') {
-        // Ataque comum
-        document.getElementById('color').style.backgroundColor = 'rgba(255, 0, 0, 0.53)';
-        document.getElementById('icon').innerHTML = '<a href="#" class="unit_link" data-unit="axe"><img src="https://dsbr.innogamescdn.com/asset/fd86cac8/graphic/unit/unit_axe.png" alt="Unit Image"></a>';
-    } else if (savedModels[0].NtType && savedModels[0].NtType != '0') {
-        // Ataque NT
-        document.getElementById('color').style.backgroundColor = 'rgba(255, 197, 12, 0.85)';
-        document.getElementById('icon').innerHTML = '<a href="#" class="unit_link" data-unit="snob"><img src="https://dsbr.innogamescdn.com/asset/fd86cac8/graphic/unit/unit_snob.png" alt="Unit Image"></a>';
-    } else if (savedModels[0].nome === 'Apoio') {
-        document.getElementById('color').style.backgroundColor = 'rgba(0, 0, 255, 0.53)';
-        document.getElementById('icon').innerHTML = '<a href="#" class="unit_link" data-unit="sword"><img src="https://dsbr.innogamescdn.com/asset/fd86cac8/graphic/unit/unit_sword.png" alt="Unit Image"></a>';
-    }
+                // Atualiza os valores das unidades na linha
+                firstModel.units.forEach((unit, index) => {
+                    const td = row.children[index];
+                    td.textContent = unit.inputValue;
+                });
 
-    // Preenche dados nos inputs
-    let nameTypeCommand = '';
-    console.log(savedModels[0])
-    if (savedModels[0].NtType != '0') {
-        nameTypeCommand = 'Nobre'
-    } else {
-        nameTypeCommand = savedModels[0].nome;
-    }
+                // Definir ícone e cor com base no tipo de comando
+                updateCommandStyle(firstModel);
 
-    document.getElementById('Tcmd').textContent = nameTypeCommand;
-    document.getElementById('Hsaida').value = savedModels[0].Dsaida;
-    document.getElementById('CFrom').value = savedModels[0].CFrom;
-    document.getElementById('alvoCatC').value = savedModels[0].AlvCat;
-    document.getElementById('NTtypeABC').value = savedModels[0].NtType;
-    document.getElementById('CTo').value = savedModels[0].CTo;
-    document.getElementById('Hchegada').value = savedModels[0].Dchegada;
+                // Preenche os dados nos inputs
+                let nameTypeCommand = firstModel.NtType != '0' ? 'Nobre' : firstModel.nome;
+                document.getElementById('Tcmd').textContent = savedModels[0].nome;
+                document.getElementById('Hsaida').value = savedModels[0].Dsaida;
+                document.getElementById('CFrom').value = savedModels[0].CFrom;
+                document.getElementById('alvoCatC').value = savedModels[0].AlvCat;
+                document.getElementById('NTtypeABC').value = savedModels[0].NtType;
+                document.getElementById('CTo').value = savedModels[0].CTo;
+                document.getElementById('Hchegada').value = savedModels[0].Dchegada;
 
-    // --- CÁLCULOS DE INFORMAÇÕES ---
+                // Exibe o total de comandos agendados
+                updateCommandCounts(savedModels);
+            }
 
-    const totalComandos = savedModels.length;
+            // Função para atualizar o estilo e ícone com base no tipo de comando
+            function updateCommandStyle(model) {
+                const colorElement = document.getElementById('color');
+                const iconElement = document.getElementById('icon');
 
-    const totalAtaques = savedModels.filter(model => model.nome === 'Atak').length;
+                console.log(model.nome, model.NtType, model.nome === 'Atak' && model.NtType == '0');
 
-    const totalApoios = savedModels.filter(model => model.nome === 'Apoio').length;
+                if (model.nome === 'Atak' && model.NtType == '0') {
+                    // Ataque comum
+                    colorElement.style.backgroundColor = 'rgba(255, 0, 0, 0.53)';
+                    iconElement.innerHTML = '<a href="#" class="unit_link" data-unit="axe"><img src="https://dsbr.innogamescdn.com/asset/fd86cac8/graphic/unit/unit_axe.png" alt="Unit Image"></a>';
+                } else if (model.NtType && model.NtType != '0') {
+                    // Ataque NT
+                    colorElement.style.backgroundColor = 'rgba(255, 197, 12, 0.85)';
+                    iconElement.innerHTML = '<a href="#" class="unit_link" data-unit="snob"><img src="https://dsbr.innogamescdn.com/asset/fd86cac8/graphic/unit/unit_snob.png" alt="Unit Image"></a>';
+                } else if (model.nome === 'Apoio') {
+                    // Apoio
+                    colorElement.style.backgroundColor = 'rgba(0, 0, 255, 0.53)';
+                    iconElement.innerHTML = '<a href="#" class="unit_link" data-unit="sword"><img src="https://dsbr.innogamescdn.com/asset/fd86cac8/graphic/unit/unit_sword.png" alt="Unit Image"></a>';
+                }
+            }
 
-    const totalNTs = savedModels.filter(model =>
-        model.nome === 'Atak' &&
-        model.NtType &&
-        model.NtType.toLowerCase().includes('nt')
-    ).length;
+            // Função para atualizar os totais de comandos agendados
+            function updateCommandCounts(models) {
+                const totalComandos = models.length;
 
-    // --- EXIBIÇÃO FINAL ---
-    // Total de comandos
-document.getElementById('CmdAG').textContent = `Número de Comandos Agendados: ${savedModels.length}`;
+                const totalAtaques = models.filter(model => model.nome === 'Atak').length;
+                const totalApoios = models.filter(model => model.nome === 'Apoio').length;
+                const totalNTs = models.filter(model => model.nome === 'Atak' && model.NtType && model.NtType != '0').length;
 
-// Total de ataques
-const totalAtak = savedModels.filter(model => model.nome === 'Atak');
-document.getElementById('CmdA').textContent = `Número de Ataques Agendados: ${totalAtak.length}`;
+                // Exibe os totais no DOM
+                document.getElementById('CmdAG').textContent = `Número de Comandos Agendados: ${totalComandos}`;
+                document.getElementById('CmdA').textContent = `Número de Ataques Agendados: ${totalAtaques}`;
+                document.getElementById('CmdD').textContent = `Número de Apoios Agendados: ${totalApoios}`;
+                document.getElementById('CmdNT').textContent = `Número de NTs Agendados: ${totalNTs}`;
+            }
 
-// Total de apoios
-const totalApoio = savedModels.filter(model => model.nome === 'Apoio');
-document.getElementById('CmdD').textContent = `Número de Apoios Agendados: ${totalApoio.length}`;
-
-// Total de ataques com NT
-const totalNT = totalAtak.filter(model => model.NtType && model.NtType != '0');
-document.getElementById('CmdNT').textContent = `Número de NTs Agendados: ${totalNT.length}`;
-}
-
-//=================================================================================================
+            //=================================================================================================
             setTimeout(checkAndOpenLinks, 1000);
         }
 
@@ -888,53 +959,41 @@ document.getElementById('CmdNT').textContent = `Número de NTs Agendados: ${tota
         function send() {
             const inputField = document.querySelector('.target-input-field');
             const savedModels = JSON.parse(localStorage.getItem('savedModels')) || [];
-
-            // Verifica se a janela de origem está aberta
             if (window.opener && !window.opener.closed) {
-
-                savedModels.forEach((model) => {
+                savedModels.forEach((model, index) => {
                     if (model.opened) {
                         model.units.forEach(unit => {
                             const inputName = unit.unitName;
                             const inputValue = unit.inputValue;
-
                             console.log(`Inserindo unidade: ${inputName}, Valor: ${inputValue}`);
-
-                            // Verifica se o valor a ser inserido é 'all' ou outro valor
-                            let input;
+                            // Insere o valor coletado na respectiva input
                             if (inputValue === 'all') {
-                                input = document.getElementById(`units_entry_all_${inputName}`);
-                                if (input) input.click();  // Verifica se o botão existe antes de clicar
+                                const input = document.getElementById(`units_entry_all_${inputName}`);
+                                input.click();
                             } else {
-                                input = document.getElementById(`unit_input_${inputName}`);
-                                if (input) input.value = inputValue;  // Verifica se o input existe antes de atribuir valor
+                                const input = document.getElementById(`unit_input_${inputName}`);
+                                input.value = inputValue;
                             }
                         });
-
-                        // Se o campo de entrada estiver oculto, tenta clicar em um botão específico após 2 segundos
-                        if (inputField && inputField.style.display === 'none') {
+                        if (inputField.style.display === 'none') {
                             setTimeout(() => {
                                 if (model.nome === 'Atak') {
-                                    const attackButton = document.getElementById('target_attack');
-                                    if (attackButton) attackButton.click();
+                                    document.getElementById('target_attack').click();
                                 } else {
-                                    const supportButton = document.getElementById('target_support');
-                                    if (supportButton) supportButton.click();
+                                    document.getElementById('target_support').click();
                                 }
                             }, 2000);
                         }
                     }
                 });
 
-                // Fecha a janela após 3 segundos
-                setTimeout(() => {
-                    window.close(); // Fecha a janela pop-up
-                }, 3000);
             }
         }
 
         send();
-
+        setTimeout(() => {
+            window.close();
+        }, 3000);
         let btnComand = document.getElementById('target_support');
         btnComand.insertAdjacentHTML('afterend', $BtnCommand);
 
@@ -944,8 +1003,8 @@ document.getElementById('CmdNT').textContent = `Número de NTs Agendados: ${tota
             if (existing) {
                 existing.remove();
             }
-            let Tabelagendados =`
-                <div id="content_history_comands">
+            let Tabelagendados = `
+            <div id="content_history_comands">
                     <table id="dataTable" class="vis overview_table" width="100%" style="border-spacing: 2px; border-collapse: separate; border: 1px solid #7d510f; border-top: 0px;">
                         <thead>
                             <tr>
@@ -988,13 +1047,13 @@ document.getElementById('CmdNT').textContent = `Número de NTs Agendados: ${tota
                         if (model.nome === 'Atak') {
                             let newRowHTML = `<tr class="nowrap">
             ${model?.NtType != '0'
-                ? '<td style="background-color: rgba(255,197,12,0.85);"><a href="#" class="unit_link" data-unit="axe"><img src="https://dsbr.innogamescdn.com/asset/fd86cac8/graphic/unit/unit_snob.png" alt="Unit Image"></a></td>'
-                : '<td style="background-color: rgba(255, 0, 0, 0.53);"><a href="#" class="unit_link" data-unit="axe"><img src="https://dsbr.innogamescdn.com/asset/fd86cac8/graphic/unit/unit_axe.png" alt="Unit Image"></a></td>'
-            }
+                                    ? '<td style="background-color: rgba(255,197,12,0.85);"><a href="#" class="unit_link" data-unit="axe"><img src="https://dsbr.innogamescdn.com/asset/fd86cac8/graphic/unit/unit_snob.png" alt="Unit Image"></a></td>'
+                                    : '<td style="background-color: rgba(255, 0, 0, 0.53);"><a href="#" class="unit_link" data-unit="axe"><img src="https://dsbr.innogamescdn.com/asset/fd86cac8/graphic/unit/unit_axe.png" alt="Unit Image"></a></td>'
+                                }
             ${model?.NtType != '0'
-                ? '<td style="background-color: rgba(255,197,12,0.85);"><span>Nobre</span></td>'
-                : '<td style="background-color: rgba(255, 0, 0, 0.53);"><span>Ataque</span></td>'
-            }
+                                    ? '<td style="background-color: rgba(255,197,12,0.85);"><span>Nobre</span></td>'
+                                    : '<td style="background-color: rgba(255, 0, 0, 0.53);"><span>Ataque</span></td>'
+                                }
             <td style="text-align:center"><span>${model.CFrom}</span></td>
             <td style="text-align:center"><span>${model.CTo}</span></td>
             <td><input id="Hsaidah-${index}" value="${model.Dsaida}" type="datetime-local" readonly style="width: 165px;"></td>
@@ -1056,7 +1115,7 @@ document.getElementById('CmdNT').textContent = `Número de NTs Agendados: ${tota
             }
 
             carregar();
-// Função para deletar item
+            // Função para deletar item
             tableBody.addEventListener('click', function (event) {
                 if (event.target.closest('.deleteItem')) {
                     const index = event.target.closest('.deleteItem').dataset.index;
@@ -1067,7 +1126,7 @@ document.getElementById('CmdNT').textContent = `Número de NTs Agendados: ${tota
                     carregar();
                 }
             });
-// Função para editar item
+            // Função para editar item
             tableBody.addEventListener('click', function (event) {
                 if (event.target.closest('.editButton')) {
                     const index = event.target.closest('.editButton').dataset.index;
@@ -1082,7 +1141,7 @@ document.getElementById('CmdNT').textContent = `Número de NTs Agendados: ${tota
                     confirmBtn.style.display = 'inline'; // Mostra o botão de confirmar
                 }
             });
-// Função para confirmar edição
+            // Função para confirmar edição
             tableBody.addEventListener('click', function (event) {
                 if (event.target.closest('.confirmedt')) {
                     const index = event.target.closest('.confirmedt').dataset.index;
@@ -1110,7 +1169,7 @@ document.getElementById('CmdNT').textContent = `Número de NTs Agendados: ${tota
         document.getElementById('showComandos').addEventListener('click', function () {
             updateTable();
         });
-        document.getElementById('BTNApagarComandos').addEventListener('click', function() {
+        document.getElementById('BTNApagarComandos').addEventListener('click', function () {
             localStorage.removeItem('savedModels');
             UI.InfoMessage('Agendamentos Apagados com sucesso!');
         });
@@ -1154,66 +1213,135 @@ document.getElementById('CmdNT').textContent = `Número de NTs Agendados: ${tota
     <td class="nowrap"><input id="unit_input_knight_massa_nro" name="knight" type="text" value="" data-all-count="0" style="width : 90%;"></td>
     <td class="nowrap"><input id="unit_input_snob_massa_nro" name="snob" type="text" value="" data-all-count="0" style="width : 90%;"></td>
     </tr>
-    <tr><td colspan="2">
-
-    <span>Alvo das Catapultas: </span></td><td colspan="10"><select id="alvoCatapaMassa" style="font-size: 9pt;">
-    <option value="padrao">Padrão</option><option value="main">Edifício principal</option> <option value="barracks">Quartel</option>
-    <option value="stable">Estábulo</option><option value="garage">Oficina</option><option value="watchtower">Torre de vigia</option>
-    <option value="snob">Academia</option><option value="smith">Ferreiro</option><option value="place">Praça de reunião</option>
-    <option value="statue">Estátua</option><option value="market">Mercado</option><option value="wood">Bosque</option>
-    <option value="stone">Poço de argila</option><option value="iron">Mina de ferro</option>                           <option value="farm">Fazenda</option>
-    <option value="storage">Armazém</option><option value="wall">Muralha</option></select></td></tr></tbody></table>
-
-    </div><div class="vis" style="margin: 5px;"><div style="margin: 10px;">                 <br>
-    <span>Grupo de Origem</span><span id="group" style="font-size: 9pt;"></span><button type="button" id="botaoGrupoBuscaCoordenada" class="support btn btn-target-action">Importar Coordenadas</button><br><br>
-
-    <span>Coordenadas Origem</span>
-    <textarea id="CoordenadasOrigem" rows="6" style="width: 99%;"></textarea>                 <br>
-    <button type="button" id="botaoRemoveCoordenadaOrigemUtilizadas" class="support btn btn-target-action">Organizar e Remove Coordenadas Já Utilizadas</button><input id="NroOrigens" readonly="" style="float: right; width: 40px;">
-    <span style="float: right; margin-right: 5px;">Nro de Origem:</span><br><br><span>Nro de Origem por Destino:</span><input id="NroOrigensPorAlvo" style="width: 40px;">
-    <br><br><div style="margin-bottom: 5px;"><span>Definição de Origens por Destinos: </span><select id="defOrigemDestino" style="font-size: 9pt;">
-    <option value="P">Priorizar Mais Próximas</option><option value="D">Priorizar Mais Distantes</option></select></div><br>
-
-    <span>Coordenadas Destino</span>
-    <textarea id="CoordenadasDestino" rows="6" style="width: 99%;"></textarea>
-    <button type="button" id="botaoRemoveCoordenadaDestinoUtilizadas" class="support btn btn-target-action">Organizar e Remove Coordenadas Já Utilizadas</button>
-    <input id="NroDestinos" readonly="" style="float: right; width: 40px;"><span style="float: right; margin-right: 5px;">Nro de Destinos:</span><br><br>
-    <div style="margin-bottom: 5px;"><span>Modalidade de Cadastro: </span><select id="ModEnvioMassa" style="font-size: 9pt;">
-    <option value="0">Programado</option>
-    <option value="1">Programação Aleatória</option></select></div><div>
-    <span name="envioProgramado">Horario de Chegada</span><input name="envioProgramado" type="datetime-local" id="CStimeMassa" step=".001">
-    <span name="envioProgramadoAleatorio" style="display: none;">Até </span>
-    <input name="envioProgramadoAleatorio" style="display: none;" type="datetime-local" id="CStimeMassaAte" step=".001"></div>
-    <div>
-    <input type="checkbox" id="EnvioMesmoBN" name="EnvioMesmoBN"><label for="EnvioMesmoBN">Enviar Mesmo se Comando Bater no BN</label>                 </div>                 <div>
-    <input type="checkbox" id="EnvioMesmoSemTempo" name="EnvioMesmoSemTempo"><label for="EnvioMesmoSemTempo">Enviar Mesmo que Comando não chegue mais a Tempo</label>                 </div>                 <div>
-    <input type="checkbox" id="CadastroComErro" name="CadastroComErro"><label for="CadastroComErro">Agendar Comandos em Massa mesmo que algum Comando esteja com Problema</label>                 </div>
-    <br>
-    <button type="button" id="agendarEmMassaConfirmAtaque" class="attack btn btn-attack btn-target-action" style="margin-bottom:5px;">Confirmar Ataque Em Massa</button>
-    <button type="button" id="agendarEmMassaConfirmApoio" class="support btn btn-support btn-target-action" style="margin-bottom:5px;">Confirmar Apoio Em Massa</button>
-    <button type="button" id="simularEmMassaConfirm" class="support btn btn-target-action" style="margin-bottom:5px;">Simulação Em Massa</button></div></div></div>
-
-   <style>
-    .tooltipDiv .tooltiptext {
-        visibility: hidden;
-        width: 200px;
-        background-color: black;
-        color: #fff;
-        text-align: center;
-        border-radius: 6px;
-        padding: 5px;
-        position: absolute;
-        z-index: 1;
-        top: 100%;
-        left: 50%;
-        transform: translateX(-50%);
-        opacity: 0;
-        transition: opacity 0.3s;
-    }
-     .tooltipDiv:hover .tooltiptext {
-        visibility: visible;
-        opacity: 1;
-    }</style>`;
+    </tbody></table>
+                            <tr>
+                                <td colspan="12" style="display: flex; align-items: center; gap: 20px;">
+                                    <div style="display: flex; align-items: center;">
+                                        <span>Alvo das Catapultas: </span>
+                                        <select id="alvoCatapaMassa" style="font-size: 9pt; margin-left: 5px;">
+                                            <option value="padrao">Padrão</option>
+                                            <option value="main">Edifício principal</option>
+                                            <option value="barracks">Quartel</option>
+                                            <option value="stable">Estábulo</option>
+                                            <option value="garage">Oficina</option>
+                                            <option value="watchtower">Torre de vigia</option>
+                                            <option value="snob">Academia</option>
+                                            <option value="smith">Ferreiro</option>
+                                            <option value="place">Praça de reunião</option>
+                                            <option value="statue">Estátua</option>
+                                            <option value="market">Mercado</option>
+                                            <option value="wood">Bosque</option>
+                                            <option value="stone">Poço de argila</option>
+                                            <option value="iron">Mina de ferro</option>
+                                            <option value="farm">Fazenda</option>
+                                            <option value="storage">Armazém</option>
+                                            <option value="wall">Muralha</option>
+                                        </select>
+                                    </div></tr>
+                                    <tr><div style="display: flex; align-items: center;">
+                                        <span>Modelo de NT: </span>
+                                        <div class="tooltipDiv" style="margin-left: 5px;">
+                                            <select id="NTtypeABC" style="font-size: 9pt;">
+                                                <option value="0">SEM NT</option>
+                                                <option value="1">NT CANCEL</option>
+                                                <option value="2">NT 2</option>
+                                                <option value="3">NT 3</option>
+                                                <option value="4">NT 4</option>
+                                                <option value="5">NT 5</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+                    </table>
+                </div>
+                <!-- Grupos, coordenadas e opções -->
+                <div class="vis" style="margin: 5px;">
+                    <div style="margin: 10px;">
+                        <span>Grupo de Origem</span>
+                        <span id="group" style="font-size: 9pt;"></span>
+                        <button type="button" id="botaoGrupoBuscaCoordenada" class="support btn btn-target-action">Importar Coordenadas</button>
+                        <br><br>
+                        <span>Coordenadas Origem</span>
+                        <textarea id="CoordenadasOrigem" rows="6" style="width: 99%;"></textarea>
+                        <br>
+                        <button type="button" id="botaoRemoveCoordenadaOrigemUtilizadas" class="support btn btn-target-action">Organizar e Remove Coordenadas Já Utilizadas</button>
+                        <input id="NroOrigens" readonly="" style="float: right; width: 40px;">
+                        <span style="float: right; margin-right: 5px;">Nro de Origem:</span>
+                        <br><br>
+                        <span>Nro de Origem por Destino:</span>
+                        <input id="NroOrigensPorAlvo" style="width: 40px;">
+                        <br><br>
+                        <div style="margin-bottom: 5px;">
+                            <span>Definição de Origens por Destinos: </span>
+                            <select id="defOrigemDestino" style="font-size: 9pt;">
+                                <option value="P">Priorizar Mais Próximas</option>
+                                <option value="D">Priorizar Mais Distantes</option>
+                            </select>
+                        </div>
+                        <br>
+                        <span>Coordenadas Destino</span>
+                        <textarea id="CoordenadasDestino" rows="6" style="width: 99%;"></textarea>
+                        <button type="button" id="botaoRemoveCoordenadaDestinoUtilizadas" class="support btn btn-target-action">Organizar e Remove Coordenadas Já Utilizadas</button>
+                        <input id="NroDestinos" readonly="" style="float: right; width: 40px;">
+                        <span style="float: right; margin-right: 5px;">Nro de Destinos:</span>
+                        <br><br>
+                        <div style="margin-bottom: 5px;">
+                            <span>Modalidade de Cadastro: </span>
+                            <select id="ModEnvioMassa" style="font-size: 9pt;">
+                                <option value="0">Programado</option>
+                                <option value="1">Programação Aleatória</option>
+                            </select>
+                        </div>
+                        <div>
+                            <span name="envioProgramado">Horario de Chegada</span>
+                            <input name="envioProgramado" type="datetime-local" id="CStimeMassa" step=".001">
+                            <span name="envioProgramadoAleatorio" style="display: none;">Até </span>
+                            <input name="envioProgramadoAleatorio" style="display: none;" type="datetime-local" id="CStimeMassaAte" step=".001">
+                        </div>
+                        <div>
+                            <input type="checkbox" id="EnvioMesmoBN" name="EnvioMesmoBN"><label for="EnvioMesmoBN">Enviar Mesmo se Comando Bater no BN</label>
+                        </div>
+                        <div>
+                            <input type="checkbox" id="EnvioMesmoSemTempo" name="EnvioMesmoSemTempo"><label for="EnvioMesmoSemTempo">Enviar Mesmo que Comando não chegue mais a Tempo</label>
+                        </div>
+                        <div>
+                            <input type="checkbox" id="CadastroComErro" name="CadastroComErro"><label for="CadastroComErro">Agendar Comandos em Massa mesmo que algum Comando esteja com Problema</label>
+                        </div>
+                    </div>
+                        <div style="margin-top: 10px;">
+                        <button type="button" id="agendarEmMassaConfirmAtaque" class="attack btn btn-attack btn-target-action" style="margin-bottom:5px;">Confirmar Ataque Em Massa</button>
+                        <button type="button" id="agendarEmMassaConfirmApoio" class="support btn btn-support btn-target-action" style="margin-bottom:5px;">Confirmar Apoio Em Massa</button>
+                    </div>
+                </div>
+                <style>
+                    .tooltipDiv .tooltiptext {
+                        visibility: hidden;
+                        width: 200px;
+                        background-color: black;
+                        color: #fff;
+                        text-align: center;
+                        border-radius: 6px;
+                        padding: 5px;
+                        position: absolute;
+                        z-index: 1;
+                        top: 100%;
+                        left: 50%;
+                        transform: translateX(-50%);
+                        opacity: 0;
+                        transition: opacity 0.3s;
+                    }
+                    .tooltipDiv:hover .tooltiptext {
+                        visibility: visible;
+                        opacity: 1;
+                    }
+                </style>
+            </div>
+            `;
             // Adiciona o HTML antes de cada elemento 'menu-item'
             document.getElementById('contentContainer').insertAdjacentHTML('afterend', $Html10);
 
@@ -1244,7 +1372,7 @@ document.getElementById('CmdNT').textContent = `Número de NTs Agendados: ${tota
         <select id="raGroupsFilter1">`;
 
                 for (const [_, group] of Object.entries(groups.result)) {
-                    const {group_id, name} = group;
+                    const { group_id, name } = group;
                     const isSelected = parseInt(group_id) === selected_Group ? 'selected' : '';
                     if (name !== undefined) {
                         groupsFilter += `<option value="${group_id}" ${isSelected}>${name}</option>`;
@@ -1257,142 +1385,186 @@ document.getElementById('CmdNT').textContent = `Número de NTs Agendados: ${tota
             }
 
 // Função para atualizar a div com id "group"
-            async function updateGroupFilter() {
-                const groupDiv = document.getElementById('group');
-                if (!groupDiv) {
-                    console.error('Div "group" não encontrada.');
-                    return;
-                }
+async function updateGroupFilter() {
+    const groupDiv = document.getElementById('group');
+    if (!groupDiv) {
+        console.error('Div "group" não encontrada.');
+        return;
+    }
 
-                const groupsFilter = await renderGroupsFilter();
-                if (!groupsFilter) {
-                    console.error('Erro ao renderizar o filtro de grupos.');
-                    return;
-                }
+    const groupsFilter = await renderGroupsFilter();
+    if (!groupsFilter) {
+        console.error('Erro ao renderizar o filtro de grupos.');
+        return;
+    }
 
-                groupDiv.innerHTML = groupsFilter;
+    groupDiv.innerHTML = groupsFilter;
+}
+
+updateGroupFilter();
+
+// carregar aldeias no textarea
+function fetchAndSaveVillagesData(selected_Group) {
+    const url = game_data.link_base_pure + 'groups&ajax=load_villages_from_group';
+    const group_id = selected_Group;
+
+    return new Promise((resolve, reject) => {
+        jQuery.post({
+            url: url,
+            data: { group_id: group_id },
+            success: function (response) {
+                const parser = new DOMParser();
+                const htmlDoc = parser.parseFromString(response.html, 'text/html');
+                const tableRows = jQuery(htmlDoc).find('#group_table > tbody > tr').not(':eq(0)');
+
+                let villagesList = [];
+
+                tableRows.each(function (index) {
+                    const villageId = parseInt(jQuery(this).find('td:eq(0) a').attr('data-village-id') ?? jQuery(this).find('td:eq(0) a').attr('href').match(/\d+/)[0]);
+                    const villageName = jQuery(this).find('td:eq(0)').text().trim();
+                    const villageCoords = jQuery(this).find('td:eq(1)').text().trim();
+
+                    villagesList.push({ id: villageId, name: villageName, coords: villageCoords });
+                });
+
+                resolve(villagesList); // Resolve a promessa com a lista de aldeias
+            },
+            error: function (error) {
+                console.error('Erro ao buscar dados das aldeias:', error);
+                reject(error); // Rejeita a promessa em caso de erro
             }
+        });
+    });
+}
 
-            updateGroupFilter();
+document.getElementById('botaoGrupoBuscaCoordenada').addEventListener('click', function () {
+    const selectedGroupValue = document.getElementById('raGroupsFilter1').value;
+    fetchAndSaveVillagesData(selectedGroupValue)
+        .then(villages => {
+            const textarea = document.getElementById('CoordenadasOrigem');
+            const coordsToIDOrigem = {};
 
-            // carregar aldeias no textarea
-            function fetchAndSaveVillagesData(selected_Group) {
-                const url = game_data.link_base_pure + 'groups&ajax=load_villages_from_group';
-                const group_id = selected_Group;
+            textarea.value = villages.map(v => {
+                coordsToIDOrigem[v.coords] = v.id;  // salva coord → id
+                return v.coords;
+            }).join(' ');
 
-                return new Promise((resolve, reject) => {
-                    jQuery.post({
-                        url: url,
-                        data: {group_id: group_id},
-                        success: function (response) {
-                            const parser = new DOMParser();
-                            const htmlDoc = parser.parseFromString(response.html, 'text/html');
-                            const tableRows = jQuery(htmlDoc).find('#group_table > tbody > tr').not(':eq(0)');
+            // Salva mapa no localStorage
+            localStorage.setItem('coordenadasOrigem', JSON.stringify(coordsToIDOrigem));
+            console.log('coordenadasOrigem salvas:', coordsToIDOrigem);
 
-                            let villagesList = [];
+            const totalC = villages.length;
+            document.getElementById('NroOrigens').value = totalC;
+        })
+        .catch(error => {
+            console.error('Erro ao processar as aldeias:', error);
+        });
+});
 
-                            tableRows.each(function (index) {
-                                const villageId = parseInt(jQuery(this).find('td:eq(0) a').attr('data-village-id') ?? jQuery(this).find('td:eq(0) a').attr('href').match(/\d+/)[0]);
-                                const villageName = jQuery(this).find('td:eq(0)').text().trim();
-                                const villageCoords = jQuery(this).find('td:eq(1)').text().trim();
+// organizando coordenadas coladas na area origem
+document.getElementById('botaoRemoveCoordenadaOrigemUtilizadas').addEventListener('click', function () {
+    const inputText = document.getElementById('CoordenadasOrigem').value;
+    const savedModels = JSON.parse(localStorage.getItem('savedModels')) || []; // Recupera os modelos salvos do localStorage
 
-                                villagesList.push({id: villageId, name: villageName, coords: villageCoords});
-                            });
+    // Regex para encontrar os pares no formato 123|456
+    const regex = /\b(\d{3})\|(\d{3})\b/g;
+    const matches = [];
+    let match;
 
-                            resolve(villagesList); // Resolve a promessa com a lista de aldeias
-                        },
-                        error: function (error) {
-                            console.error('Erro ao buscar dados das aldeias:', error);
-                            reject(error); // Rejeita a promessa em caso de erro
-                        }
-                    });
-                });
+    // Loop para encontrar todas as coordenadas no input
+    while ((match = regex.exec(inputText)) !== null) {
+        matches.push(`${match[1]}|${match[2]}`);
+    }
+
+    // Extração das coordenadas em CTo e CFrom dos itens do localStorage
+    const savedCoordinates = [];
+    savedModels.forEach(model => {
+        if (model.CTo) {
+            savedCoordinates.push(model.CTo);
+        }
+        if (model.CFrom) {
+            savedCoordinates.push(model.CFrom);
+        }
+    });
+
+    // Filtrar coordenadas que não estão nas coordenadas salvas
+    const filteredMatches = matches.filter(coord => !savedCoordinates.includes(coord));
+
+    // Atualizar o campo de texto com as coordenadas restantes
+    const outputText = filteredMatches.join(' ');
+    document.getElementById('CoordenadasOrigem').value = outputText;
+
+    // Atualizar o total de coordenadas restantes
+    const totalC = filteredMatches.length;
+    document.getElementById('NroOrigens').value = totalC;
+});
+
+document.getElementById('botaoRemoveCoordenadaDestinoUtilizadas').addEventListener('click', async function () {
+    const inputText = document.getElementById('CoordenadasDestino').value;
+
+    // Regex para encontrar os pares no formato 123|456
+    const regex = /\b(\d{3})\|(\d{3})\b/g;
+    const matches = [];
+    let match;
+
+    // Loop para encontrar todas as coordenadas no input
+    while ((match = regex.exec(inputText)) !== null) {
+        matches.push(`${match[1]}|${match[2]}`);
+    }
+
+    // Extração das coordenadas em CTo e CFrom dos itens do localStorage
+    const savedModels = JSON.parse(localStorage.getItem('savedModels')) || [];
+    const savedCoordinates = [];
+    savedModels.forEach(model => {
+        if (model.CTo) savedCoordinates.push(model.CTo);
+        if (model.CFrom) savedCoordinates.push(model.CFrom);
+    });
+
+    // Filtrar coordenadas que não estão nas coordenadas salvas
+    const filteredMatches = matches.filter(coord => !savedCoordinates.includes(coord));
+
+    // Atualizar o campo de texto com as coordenadas restantes
+    const outputText = filteredMatches.join(' ');
+    document.getElementById('CoordenadasDestino').value = outputText;
+
+    // Atualizar o total de coordenadas restantes
+    document.getElementById('NroDestinos').value = filteredMatches.length;
+
+    // Criar objeto coord => id para as coordenadas destino, buscando no /map/village.txt se necessário
+    const destinoMap = {};
+    for (const coord of filteredMatches) {
+        let id = null;
+        // Procura no savedModels
+        const model = savedModels.find(m => m.CTo === coord || m.CFrom === coord);
+        if (model && model.link) {
+            const match = model.link.match(/target=(\d+)/);
+            if (match) {
+                id = match[1];
             }
+        }
+        if (!id) {
+            // Busca no /map/village.txt
+            const [x, y] = coord.split('|');
+            try {
+                const response = await fetch(`/map/village.txt`, { cache: "no-store" });
+                const text = await response.text();
+                const villages = text.split('\n').map(line => line.split(','));
+                const villageData = villages.find(v => v[2] === x && v[3] === y);
+                id = villageData ? villageData[0] : null;
+                if (!id) alert('Coordenadas inválidas: ' + coord);
+            } catch (e) {
+                alert('Erro ao buscar dados da vila');
+                id = null;
+            }
+        }
+        destinoMap[coord] = id;
+    }
 
-            document.getElementById('botaoGrupoBuscaCoordenada').addEventListener('click', function () {
-                const selectedGroupValue = document.getElementById('raGroupsFilter1').value;
-                fetchAndSaveVillagesData(selectedGroupValue)
-                    .then(villages => {
-                        const textarea = document.getElementById('CoordenadasOrigem');
-                        // textarea.value = villages.map(v => `${v.coords}`).join(' ');
-                        textarea.value = villages.map(v => v.coords).join(' ');
-                        const totalC = villages.length;
+    // Salva no localStorage
+    localStorage.setItem('coordenadasDestino', JSON.stringify(destinoMap));
+    console.log('coordenadasDestino salvas no localStorage:', destinoMap);
+});
 
-                        document.getElementById('NroOrigens').value = totalC;
-                    })
-                    .catch(error => {
-                        console.error('Erro ao processar as aldeias:', error);
-                    });
-            });
-            // organizando coordenadas coladas na area origem
-            document.getElementById('botaoRemoveCoordenadaOrigemUtilizadas').addEventListener('click', function () {
-                const inputText = document.getElementById('CoordenadasOrigem').value;
-                const savedModels = JSON.parse(localStorage.getItem('savedModels')) || []; // Recupera os modelos salvos do localStorage
-
-                // Regex para encontrar os pares no formato 123|456
-                const regex = /\b(\d{3})\|(\d{3})\b/g;
-                const matches = [];
-                let match;
-
-                // Loop para encontrar todas as coordenadas no input
-                while ((match = regex.exec(inputText)) !== null) {
-                    matches.push(`${match[1]}|${match[2]}`);
-                }
-
-                // Extração das coordenadas em CTo e CFrom dos itens do localStorage
-                const savedCoordinates = [];
-                savedModels.forEach(model => {
-                    if (model.CTo) {
-                        savedCoordinates.push(model.CTo);
-                    }
-                    if (model.CFrom) {
-                        savedCoordinates.push(model.CFrom);
-                    }
-                });
-
-                // Filtrar coordenadas que não estão nas coordenadas salvas
-                const filteredMatches = matches.filter(coord => !savedCoordinates.includes(coord));
-
-                // Atualizar o campo de texto com as coordenadas restantes
-                const outputText = filteredMatches.join(' ');
-                document.getElementById('CoordenadasOrigem').value = outputText;
-
-                // Atualizar o total de coordenadas restantes
-                const totalC = filteredMatches.length;
-                document.getElementById('NroOrigens').value = totalC;
-            });
-            // organizando coordenadas coladas na area destino
-            document.getElementById('botaoRemoveCoordenadaDestinoUtilizadas').addEventListener('click', function () {
-                const inputText = document.getElementById('CoordenadasDestino').value;
-                const savedModels = JSON.parse(localStorage.getItem('savedModels')) || []; // Recupera os modelos salvos do localStorage
-                // Regex para encontrar os pares no formato 593|309
-                const regex = /\b(\d{3})\|(\d{3})\b/g;
-                const matches = [];
-                let match;
-                // Loop para encontrar todas as correspondências
-                while ((match = regex.exec(inputText)) !== null) {
-                    matches.push(`${match[1]}|${match[2]}`);
-                }
-                // Extração das coordenadas em CTo e CFrom dos itens do localStorage
-                const savedCoordinates = [];
-                savedModels.forEach(model => {
-                    if (model.CTo) {
-                        savedCoordinates.push(model.CTo);
-                    }
-                    if (model.CFrom) {
-                        savedCoordinates.push(model.CFrom);
-                    }
-                });
-
-                // Filtrar coordenadas que não estão nas coordenadas salvas
-                const filteredMatches = matches.filter(coord => !savedCoordinates.includes(coord));
-
-                // Juntar as correspondências em uma string separada por espaços
-                const outputText = filteredMatches.join(' ');
-                document.getElementById('CoordenadasDestino').value = outputText;
-                const totalC = filteredMatches.length;
-                document.getElementById('NroDestinos').value = totalC;
-            });
             // displays nones
             document.getElementById('ModEnvioMassa').addEventListener('change', function () {
                 const spanAleatorio = document.querySelector('span[name="envioProgramadoAleatorio"]');
@@ -1423,11 +1595,11 @@ document.getElementById('CmdNT').textContent = `Número de NTs Agendados: ${tota
                 const limit = parseInt(document.getElementById("NroOrigensPorAlvo").value) || 1;
                 let xx = 0;
 
-                function gerar(coordinateOrigem, coordinatedestine, distance){
+                function gerar(coordinateOrigem, coordinatedestine, distance) {
                     const selectedUnits = [];
                     return $.get('/interface.php?func=get_unit_info').then(function ($xml) {
                         const units = {};
-                        const unitsM = [
+                        const unitsMassa = [
                             'unit_input_spear_massa_nro',
                             'unit_input_sword_massa_nro',
                             'unit_input_axe_massa_nro',
@@ -1442,21 +1614,21 @@ document.getElementById('CmdNT').textContent = `Número de NTs Agendados: ${tota
                             'unit_input_snob_massa_nro',
                         ];
 
-            for (let i = 0; i < unitsM.length; i++) {
-                const inputElement = document.getElementById(unitsM[i]);
-                const unitName = inputElement.name;
-                const inputValue = inputElement.value || 0;
-                const checkbox = document.getElementById(`unit_input_${unitName}_massa`);
+                        for (let i = 0; i < unitsMassa.length; i++) {
+                            const inputElement = document.getElementById(unitsMassa[i]);
+                            if (!inputElement) continue;
+                            const unitName = inputElement.name;
+                            const inputValue = inputElement.value || 0;
+                            const checkbox = document.getElementById(`unit_input_${unitName}_massa`);
 
-                if (!checkbox.checked) {
-                        selectedUnits.push({ unitName, inputValue });
-                } else {
-                    const inputValue = 'all';
-                    selectedUnits.push({ unitName, inputValue });
-                }
-            }
+                            if (!unitName || !checkbox) continue;
 
-//=========================================================================
+                            if (!checkbox.checked) {
+                                selectedUnits.push({ unitName, inputValue });
+                            } else {
+                                selectedUnits.push({ unitName, inputValue: 'all' });
+                            }
+                        }
 
                         // Processa o XML e calcula unitTime para as unidades
                         $($xml).find('config').children().each(function () {
@@ -1497,14 +1669,27 @@ document.getElementById('CmdNT').textContent = `Número de NTs Agendados: ${tota
                             return `${hours}:${minutes}:${seconds}`; // Formata como string
                         }
 
-                        function getLink() {
-                            if (coordinateOrigem in coordsToID && coordinatedestine in coordsToID) {
-                                return `${activeWorldData['origin']}/game.php?village=${coordsToID[coordinateOrigem]}&screen=place&target=${coordsToID[coordinatedestine]}`;
-                            }
-                            return getLink;
+                        // monta o link do agendamento em massa
+                        // Busca os mapas de coordenadas para id
+                        let coordsToIDOrigem = JSON.parse(localStorage.getItem('coordenadasOrigem')) || {};
+                        let coordsToIDDestino = JSON.parse(localStorage.getItem('coordenadasDestino')) || {};
+                        let origemId = coordsToIDOrigem[coordinateOrigem];
+                        let destinoId = coordsToIDDestino[coordinatedestine];
+
+                        // fallback: se não achar no mapa, tenta buscar no localStorage geral
+                        if (!origemId) {
+                            let coordsToID = JSON.parse(localStorage.getItem(`coordsToID_${game_data.world}`)) || {};
+                            origemId = coordsToID[coordinateOrigem];
+                        }
+                        if (!destinoId) {
+                            let coordsToID = JSON.parse(localStorage.getItem(`coordsToID_${game_data.world}`)) || {};
+                            destinoId = coordsToID[coordinatedestine];
                         }
 
-                        let link = getLink();
+                        // monta o link no formato do exemplo
+                        let link = `https://${game_data.world}.tribalwars.com.br/game.php?village=${origemId}&screen=place&target=${destinoId}`;
+
+
                         // Verifica as unidades selecionadas
                         for (const unit of selectedUnits) {
                             const unitData = units[unit.unitName];
@@ -1514,21 +1699,24 @@ document.getElementById('CmdNT').textContent = `Número de NTs Agendados: ${tota
                             }
                         }
 
-                        let nome;
-                        nome = localStorage.getItem('Nome');
+                        let nome = localStorage.getItem('Nome');
                         let Dsaida;
-                        let Dchegada = document.getElementById('CStimeMassa').value
+                        let Dchegada = document.getElementById('CStimeMassa').value;
                         let DchegadaF = document.getElementById('CStimeMassaAte').value;
                         let CFrom = coordinateOrigem;
                         let CTo = coordinatedestine;
-                        let NtType = 0;
-                        let AlvCat = document.getElementById('alvoCatapaMassa').value;
-                        if (!NtType) {
-                            NtType = 0;
+                        let AlvCat = document.getElementById('alvoCatapaMassa').value || 'padrao';
+                        let NtType = localStorage.getItem('NtType') || '0'; // Usa o valor salvo corretamente
+
+                        // Verifica se é NT válido (pode adaptar conforme seus critérios)
+                        let isNT = false;
+                        if (nome === 'Atak' && NtType !== '0' && NtType.trim().toLowerCase() !== 'sem nt') {
+                            isNT = true;
+                            console.log('Comando NT detectado');
+                        } else {
+                            console.log('Comando sem NT');
                         }
-                        if (!AlvCat) {
-                            AlvCat = 'padrao';
-                        }
+
                         // Obtém a data inserida no input
                         const inputDate = Dchegada;
                         const arrivalTime = new Date(inputDate);
@@ -1553,7 +1741,7 @@ document.getElementById('CmdNT').textContent = `Número de NTs Agendados: ${tota
                                 units: selectedUnits,
                                 Dsaida,
                                 Dchegada,
-                                NtType ,
+                                NtType,
                                 AlvCat,
                                 type: localStorage.getItem('tipoAgendamento') || 'attack'
                                 // <- ESSA LINHA
@@ -1571,7 +1759,10 @@ document.getElementById('CmdNT').textContent = `Número de NTs Agendados: ${tota
                             // Ordena o array pela data de Dsaida
                             savedModels.sort((a, b) => new Date(a.Dsaida) - new Date(b.Dsaida));
                             console.log('Modelos organizados pela data de saída:', savedModels);
+
+                            mostrarMensagem("Comando agendado com sucesso!", "sucesso");
                             // console.log(`Modelo salvo: ${JSON.stringify(savedModels, null, 2)}` );
+
                         } else {
                             console.log('Não agendado, sem tempo para enviar')
                         }
@@ -1598,17 +1789,14 @@ document.getElementById('CmdNT').textContent = `Número de NTs Agendados: ${tota
 
             document.getElementById('agendarEmMassaConfirmAtaque').addEventListener('click', function () {
                 localStorage.setItem('Nome', 'Atak');
-                localStorage.setItem('tipoAgendamento', 'attack'); // <- AQUI
+                const ntType = document.getElementById('NTtypeABC')?.value || '0';
+                localStorage.setItem('NtType', ntType);
+                localStorage.setItem('tipoAgendamento', ntType !== '0' ? 'nt' : 'attack');
                 RequestUnitsM();
             });
             document.getElementById('agendarEmMassaConfirmApoio').addEventListener('click', function () {
                 localStorage.setItem('Nome', 'Apoio');
                 localStorage.setItem('tipoAgendamento', 'support'); // <- AQUI
-                RequestUnitsM();
-            });
-            document.getElementById('simularEmMassaConfirm').addEventListener('click', function () {
-                localStorage.setItem('Nome', 'Simulacao');
-                localStorage.setItem('tipoAgendamento', 'simulation'); // <- AQUI
                 RequestUnitsM();
             });
 
@@ -1686,19 +1874,19 @@ document.getElementById('CmdNT').textContent = `Número de NTs Agendados: ${tota
                     let archerInput = document.querySelector(`input[name='train[${i}][archer]']`)
                     let marcherInput = document.querySelector(`input[name='train[${i}][marcher]']`)
 
-                    archerInput.value = unitsNt[i - 2]?.archer?? 0;
-                    marcherInput.value = unitsNt[i - 2]?.marcher?? 0;
+                    archerInput.value = unitsNt[i - 2]?.archer ?? 0;
+                    marcherInput.value = unitsNt[i - 2]?.marcher ?? 0;
                 }
                 spearInput.value = unitsNt[i - 2]?.spear ?? 0;
                 swordInput.value = unitsNt[i - 2]?.sword ?? 0;
-                axeInput.value = unitsNt[i - 2]?.axe?? 0;
-                spyInput.value = unitsNt[i - 2]?.spy?? 0;
-                knightInput.value = unitsNt[i - 2]?.knight?? 0;
-                lightInput.value = unitsNt[i - 2]?.light?? 0;
-                heavyInput.value = unitsNt[i - 2]?.heavy?? 0;
-                ramInput.value = unitsNt[i - 2]?.ram?? 0;
-                catapultInput.value = unitsNt[i - 2]?.catapult?? 0;
-                snobInput.value = unitsNt[i - 2]?.snob?? 0;
+                axeInput.value = unitsNt[i - 2]?.axe ?? 0;
+                spyInput.value = unitsNt[i - 2]?.spy ?? 0;
+                knightInput.value = unitsNt[i - 2]?.knight ?? 0;
+                lightInput.value = unitsNt[i - 2]?.light ?? 0;
+                heavyInput.value = unitsNt[i - 2]?.heavy ?? 0;
+                ramInput.value = unitsNt[i - 2]?.ram ?? 0;
+                catapultInput.value = unitsNt[i - 2]?.catapult ?? 0;
+                snobInput.value = unitsNt[i - 2]?.snob ?? 0;
             }
         }
 
@@ -1737,30 +1925,30 @@ document.getElementById('CmdNT').textContent = `Número de NTs Agendados: ${tota
             console.log('Contagem inicial (ms):', msDiff);
 
             // Função para calcular o ping (latência) e aplicar o multiplicador de Timing Offset
-         function measurePing(callback, timingOffsetMultiplier = 1) {
-             const startTime = Date.now(); // Registra o tempo de início da requisição
+            function measurePing(callback, timingOffsetMultiplier = 1) {
+                const startTime = getServerTimestamp(); // Registra o tempo de início da requisição
 
-             // Faz uma requisição simples à própria página
-             fetch(window.location.href)
-                 .then(() => {
-            const ping = Date.now() - startTime; // Calcula o tempo de resposta (ping)
+                // Faz uma requisição simples à própria página
+                fetch(window.location.href)
+                    .then(() => {
+                        const ping = getServerTimestamp() - startTime; // Calcula o tempo de resposta (ping)
 
-            // Aplica o Timing Offset Multiplier ao ping
-            const adjustedPing = ping * timingOffsetMultiplier;
+                        // Aplica o Timing Offset Multiplier ao ping
+                        const adjustedPing = ping * timingOffsetMultiplier;
 
-            // Chama o callback com o ping ajustado
-            callback(adjustedPing);
-             })
-                 .catch(() => {
-            // Em caso de erro, chama o callback com 0 de ping
-            callback(0);
-             });
-         }
+                        // Chama o callback com o ping ajustado
+                        callback(adjustedPing);
+                    })
+                    .catch(() => {
+                        // Em caso de erro, chama o callback com 0 de ping
+                        callback(0);
+                    });
+            }
 
-         // Exemplo de uso com o Timing Offset Multiplier
-         measurePing((adjustedPing) => {
-         console.log(`Ping ajustado (com multiplicador): ${adjustedPing}ms`);
-         }, 1.2); // Aplica um multiplicador de 1.2 (20% a mais no ping)
+            // Exemplo de uso com o Timing Offset Multiplier
+            measurePing((adjustedPing) => {
+                console.log(`Ping ajustado (com multiplicador): ${adjustedPing}ms`);
+            }, 0.1); // Aplica um multiplicador de 0.1 (aproximadamente 1.67%. a mais no ping)
 
             if (msDiff > 0) {
                 // Desativa os botões enquanto aguarda
@@ -1797,15 +1985,14 @@ document.getElementById('CmdNT').textContent = `Número de NTs Agendados: ${tota
                 }, msDiff);
             } else {
 
-                //Executa imediatamente caso o tempo já tenha passado
+                // Executa imediatamente caso o tempo já tenha passado
                 document.getElementById('troop_confirm_submit').disabled = false;
                 document.getElementById('troop_confirm_submit').click();
             }
-
         });
 
     }
-              
+
     function sleep(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
@@ -1821,17 +2008,17 @@ document.getElementById('CmdNT').textContent = `Número de NTs Agendados: ${tota
 
         // === Função para identificar o tipo de comando ===
         function getCommandType(model) {
-    const nome = (model.nome || '').trim().toLowerCase();
-    const isSupport = nome === 'apoio';
-    const isAttack = nome === 'atak';
-    const isNobleAttack = isAttack && model.NtType && model.NtType !== '0';
+            const nome = (model.nome || '').trim().toLowerCase();
+            const isSupport = nome === 'apoio';
+            const isAttack = nome === 'atak';
+            const isNobleAttack = isAttack && model.NtType && model.NtType !== '0';
 
-    if (isSupport) return 'apoio';
-    if (isNobleAttack) return 'nt';
-    if (isAttack) return 'ataque';
+            if (isSupport) return 'apoio';
+            if (isNobleAttack) return 'nt';
+            if (isAttack) return 'ataque';
 
-    return 'outro';
-}
+            return 'outro';
+        }
 
 
         // === Processamento dos modelos salvos ===
@@ -1921,9 +2108,11 @@ document.getElementById('CmdNT').textContent = `Número de NTs Agendados: ${tota
                 const st_pixel = mapOverlay.map.pixelByCoord(sector.x, sector.y);
                 const x = (wt_pixel[0] - st_pixel[0]) + mapOverlay.tileSize[0] / 2;
                 const y = (wt_pixel[1] - st_pixel[1]) + mapOverlay.tileSize[1] / 2;
+                localStorage.setItem('CTo', village); // Salva a coordenada de destino
+                localStorage.setItem('CFrom', sector.x + '|' + sector.y); // Salva a coordenada de origem
 
                 // Desenha o fundo (um quadrado leve)
-                drawSquare(ctx, x, y, 0.17 * TWMap.map.scale[0] * 5, 'rgba(100, 0, 255, 0.2)');
+                drawSquare(ctx, x, y, 0.17 * TWMap.map.scale[0] * 5, 'rgba(255, 0, 0, 0.2)'); //'rgba(100, 0, 255, 0.2)');
 
                 // Desenha os ícones e números, incluindo o ataque com nobre (NT)
                 drawIconsAndNumbers(ctx, x, y, ['Icon1', 'Icon2', 'Icon3'], [counts.axe, counts.spear, counts.snob], [
@@ -1989,21 +2178,21 @@ document.getElementById('CmdNT').textContent = `Número de NTs Agendados: ${tota
                 });
             });
         };
-
         mapOverlay.reload();
     }
 })();
+
+
 //==================================================== Script audio ==============================================================================
 
-let audioElement = document.getElementById("audioElement");
-if(audioElement){
-    let tocaSom = document.getElementById("tocaSom");
-for (let j = 0; j < 9; j++) {
-    audioElement.volume = Math.max(0, audioElement.volume - 1); }
-    tocaSom.onclick = function () {
-        if (audioElement.paused) {
-            audioElement.play();
+(function () {
+    if (window.location.href.includes('screen=audio')) {
+        const audio = document.querySelector('audio');
+        if (audio) {
+            audio.volume = 0.1; // Define o volume para 10%
+            console.log('Volume do áudio ajustado para 10%');
         } else {
-            audioElement.pause();
+            console.error('Elemento de áudio não encontrado na página.');
         }
-    }}
+    }
+})();
